@@ -266,6 +266,7 @@ async def save_session_with_user(session: dict[str, Any], user_id: str | None) -
                 "explanation": proposal["explanation"],
                 "documentation": proposal["documentation"],
                 "output_hash": proposal["output_hash"],
+                "tags": proposal.get("tags", []),
             }, "request_id")
 
             chained = {

@@ -1,9 +1,12 @@
 fastapi
 uvicorn
-pydantic>=2.0
+pydantic[email]>=2.0
 pygments
 ollama
 google-genai
 pytest
 httpx
 markdown
+passlib[argon2]
+PyJWT
+python-jose[cryptography]

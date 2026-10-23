@@ -8,11 +8,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 
 from agent.harness.approval import StaleApproval, apply_edits, make_approval_receipt
 from agent.harness.evidence import EvidenceLedger
@@ -22,17 +22,52 @@ from agent.tools.explainer import ExplainError, Explainer, StubExplainer
 from agent.tools.gemini_explainer import GeminiExplainer
 from agent.tools.language_detect import detect_language
 from agent.tools.local_explainer import LocalExplainer
-from apps.api import persistence
+from apps.api import persistence, auth
 from contracts.schemas import Approval, CodeSnippet, ProposedOutput
 
+
 app = FastAPI(title="Code Snippet Explainer")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=False, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 STORE: dict[str, dict[str, Any]] = {}
 ROOT = Path(__file__).resolve().parents[2]
 INDEX = ROOT / "frontend" / "dist" / "index.html"
 ASSETS_DIR = ROOT / "frontend" / "dist" / "assets"
 if ASSETS_DIR.exists():
     app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models for auth
+# ---------------------------------------------------------------------------
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str = Field(default="", max_length=64)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    user_id: str
+    email: str
+    display_name: str
+    token: str
+
+
+class UserResponse(BaseModel):
+    user_id: str
+    email: str
+    display_name: str
 
 
 class AnalyzeRequest(BaseModel):
@@ -47,6 +82,45 @@ class ReviewRequest(BaseModel):
     edited_documentation: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# Auth dependency
+# ---------------------------------------------------------------------------
+async def get_current_user_optional(authorization: str | None = Header(None)) -> dict[str, Any] | None:
+    """Optional auth - returns user if valid token, None otherwise."""
+    return await auth.get_current_user(authorization)
+
+
+async def get_current_user_required(authorization: str | None = Header(None)) -> dict[str, Any]:
+    """Required auth - raises 401 if no valid token."""
+    user = await auth.get_current_user(authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Explainer factory
+# ---------------------------------------------------------------------------
+def build_explainer() -> Explainer:
+    """Pick the explainer backend from the environment.
+
+    EXPLAINER=stub   -> StubExplainer (offline, deterministic; default)
+    EXPLAINER=ollama -> LocalExplainer (needs a running Ollama server)
+    EXPLAINER=gemini -> GeminiExplainer (needs GEMINI_API_KEY)
+    """
+    backend = os.getenv("EXPLAINER", "stub").strip().lower()
+    if backend == "ollama":
+        return LocalExplainer(host=os.environ["OLLAMA_HOST"]) if os.getenv("OLLAMA_HOST") else LocalExplainer()
+    if backend == "gemini":
+        return GeminiExplainer()
+    if backend == "stub":
+        return StubExplainer()
+    raise HTTPException(400, f"Unknown EXPLAINER backend: {backend}")
+
+
+# ---------------------------------------------------------------------------
+# Serialization
+# ---------------------------------------------------------------------------
 def serialize(session: dict[str, Any]) -> dict[str, Any]:
     orchestrator = session["orchestrator"]
     response: dict[str, Any] = {
@@ -68,23 +142,9 @@ def get_session(request_id: str) -> dict[str, Any]:
         raise HTTPException(404, "Session not found") from error
 
 
-def build_explainer() -> Explainer:
-    """Pick the explainer backend from the environment.
-
-    EXPLAINER=stub   -> StubExplainer (offline, deterministic; default)
-    EXPLAINER=ollama -> LocalExplainer (needs a running Ollama server)
-    EXPLAINER=gemini -> GeminiExplainer (needs GEMINI_API_KEY)
-    """
-    backend = os.getenv("EXPLAINER", "stub").strip().lower()
-    if backend == "ollama":
-        return LocalExplainer(host=os.environ["OLLAMA_HOST"]) if os.getenv("OLLAMA_HOST") else LocalExplainer()
-    if backend == "gemini":
-        return GeminiExplainer()
-    if backend == "stub":
-        return StubExplainer()
-    raise HTTPException(400, f"Unknown EXPLAINER backend: {backend}")
-
-
+# ---------------------------------------------------------------------------
+# Health & Public Endpoints
+# ---------------------------------------------------------------------------
 @app.get("/", include_in_schema=False)
 def index() -> FileResponse:
     if INDEX.exists():
@@ -102,13 +162,79 @@ def health() -> dict[str, str]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Auth Endpoints
+# ---------------------------------------------------------------------------
+@app.post("/api/auth/register", response_model=TokenResponse)
+async def register(body: RegisterRequest) -> TokenResponse:
+    if not persistence.enabled():
+        raise HTTPException(503, "Supabase not configured")
+
+    user = await auth.create_user(body.email, body.password, body.display_name)
+    if not user:
+        raise HTTPException(400, "Registration failed")
+
+    token = auth.create_access_token(user["user_id"], user["email"])
+    return TokenResponse(
+        user_id=user["user_id"],
+        email=user["email"],
+        display_name=user.get("display_name", ""),
+        token=token,
+    )
+
+
+@app.post("/api/auth/login", response_model=TokenResponse)
+async def login(body: LoginRequest) -> TokenResponse:
+    if not persistence.enabled():
+        raise HTTPException(503, "Supabase not configured")
+
+    user = await auth.authenticate_user(body.email, body.password)
+    if not user:
+        raise HTTPException(401, "Invalid email or password")
+
+    return TokenResponse(
+        user_id=user["user_id"],
+        email=user["email"],
+        display_name=user.get("display_name", ""),
+        token=user["token"],
+    )
+
+
+@app.get("/api/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict[str, Any] = Depends(get_current_user_required)) -> UserResponse:
+    return UserResponse(
+        user_id=current_user["user_id"],
+        email=current_user["email"],
+        display_name=current_user.get("display_name", ""),
+    )
+
+
+# ---------------------------------------------------------------------------
+# History Endpoints (user-scoped if authenticated)
+# ---------------------------------------------------------------------------
 @app.get("/api/history")
-def history(limit: int = 50) -> list[dict[str, Any]]:
-    return persistence.list_history(max(1, min(limit, 200)))
+async def history(
+    limit: int = 50,
+    current_user: dict[str, Any] | None = Depends(get_current_user_optional),
+) -> list[dict[str, Any]]:
+    if not persistence.enabled():
+        return []
+
+    if current_user:
+        return await auth.list_user_history(current_user["user_id"], limit)
+    else:
+        return persistence.list_history(max(1, min(limit, 200)))
 
 
+# ---------------------------------------------------------------------------
+# Workflow Endpoints
+# ---------------------------------------------------------------------------
 @app.post("/api/analyze")
-def analyze(body: AnalyzeRequest) -> dict[str, Any]:
+async def analyze(
+    body: AnalyzeRequest,
+    response: Response,
+    current_user: dict[str, Any] | None = Depends(get_current_user_optional),
+) -> dict[str, Any]:
     request_id = uuid.uuid4().hex
     explainer = build_explainer()
     orchestrator = Orchestrator(StateMachine(request_id), EvidenceLedger(), detect_language, explainer)
@@ -122,31 +248,52 @@ def analyze(body: AnalyzeRequest) -> dict[str, Any]:
         if orchestrator.sm.current.value == "failed":
             raise HTTPException(503, reason)
         raise HTTPException(422, reason)
+
     session = {"orchestrator": orchestrator, "proposal": proposal, "approval": None, "final_result": None, "snippet": snippet}
     STORE[request_id] = session
-    persistence.save_session(session)
+
+    # Persist with user_id if authenticated
+    user_id = current_user["user_id"] if current_user else None
+    await auth.save_session_with_user(session, user_id)
+
     return serialize(session)
 
 
 @app.post("/api/{request_id}/review")
-def review(request_id: str, body: ReviewRequest) -> dict[str, Any]:
+async def review(
+    request_id: str,
+    body: ReviewRequest,
+    current_user: dict[str, Any] | None = Depends(get_current_user_optional),
+) -> dict[str, Any]:
     session = get_session(request_id)
     proposal: ProposedOutput = session["proposal"]
-    approval = Approval(proposal_hash=proposal.output_hash, approver_id=body.approver_id, approved_at=datetime.now(timezone.utc), decision=body.decision, edited_explanation=body.edited_explanation, edited_documentation=body.edited_documentation)
+    approval = Approval(
+        proposal_hash=proposal.output_hash,
+        approver_id=body.approver_id,
+        approved_at=datetime.now(timezone.utc),
+        decision=body.decision,
+        edited_explanation=body.edited_explanation,
+        edited_documentation=body.edited_documentation,
+    )
     if body.decision == "approve" and (body.edited_explanation is not None or body.edited_documentation is not None):
-        # Edits change the canonical output hash; this deliberately demonstrates stale-approval protection.
         session["proposal"] = apply_edits(proposal, approval)
     try:
         session["orchestrator"].apply_review(session["proposal"], approval)
     except StaleApproval as error:
         raise HTTPException(409, str(error)) from error
     session["approval"] = approval.model_copy(update={"approval_receipt_hash": make_approval_receipt(approval)})
-    persistence.save_session(session)
+
+    user_id = current_user["user_id"] if current_user else None
+    await auth.save_session_with_user(session, user_id)
+
     return serialize(session)
 
 
 @app.post("/api/{request_id}/format")
-def format_result(request_id: str) -> dict[str, Any]:
+async def format_result(
+    request_id: str,
+    current_user: dict[str, Any] | None = Depends(get_current_user_optional),
+) -> dict[str, Any]:
     session = get_session(request_id)
     try:
         final_result = session["orchestrator"].format_output(session["proposal"], session["approval"])
@@ -155,7 +302,18 @@ def format_result(request_id: str) -> dict[str, Any]:
     except (RuntimeError, ValueError) as error:
         raise HTTPException(400, str(error)) from error
     session["final_result"] = final_result
-    persistence.save_session(session)
+
+    user_id = current_user["user_id"] if current_user else None
+    await auth.save_session_with_user(session, user_id)
+
+    def render_markdown(source: str) -> str:
+        """Render delivered Markdown to HTML with the `markdown` library."""
+        try:
+            import markdown as _markdown
+            return _markdown.markdown(source, extensions=["fenced_code", "tables", "sane_lists"])
+        except Exception:
+            return source
+
     return {
         "markdown": final_result.formatted_markdown,
         "html": render_markdown(final_result.formatted_markdown or ""),
@@ -163,13 +321,6 @@ def format_result(request_id: str) -> dict[str, Any]:
     }
 
 
-def render_markdown(source: str) -> str:
-    """Render delivered Markdown to HTML with the `markdown` library (planned-tool #4)."""
-    import markdown as _markdown
-
-    return _markdown.markdown(source, extensions=["fenced_code", "tables", "sane_lists"])
-
-
 @app.get("/api/{request_id}")
-def session_status(request_id: str) -> dict[str, Any]:
+async def session_status(request_id: str) -> dict[str, Any]:
     return serialize(get_session(request_id))

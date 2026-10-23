@@ -1,7 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
-export default function Navbar({ health, isHealthy, onToggleDrawer, onScrollToAudit }) {
+export default function Navbar({
+  health,
+  isHealthy,
+  onToggleDrawer,
+  onScrollToAudit,
+  user,
+  onLogin,
+  onLogout,
+  onRegister,
+}) {
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [authForm, setAuthForm] = useState({ email: '', password: '', displayName: '' });
+  const [authError, setAuthError] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const handleAuthSubmit = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setAuthLoading(true);
+    try {
+      if (authMode === 'login') {
+        await onLogin(authForm.email, authForm.password);
+      } else {
+        await onRegister(authForm.email, authForm.password, authForm.displayName);
+      }
+      setShowAuthModal(false);
+      setAuthForm({ email: '', password: '', displayName: '' });
+    } catch (error) {
+      setAuthError(error.message || 'Authentication failed');
+    } finally {
+      setAuthLoading(false);
+    }
+  };
+
+  const switchAuthMode = () => {
+    setAuthMode(authMode === 'login' ? 'register' : 'login');
+    setAuthError('');
+  };
 
   return (
     <>
@@ -70,9 +108,32 @@ export default function Navbar({ health, isHealthy, onToggleDrawer, onScrollToAu
             </nav>
 
             <div className="relative flex items-center pl-1">
-              <div className="w-9 h-9 rounded-full bg-surface-container-high ring-2 ring-primary/40 flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md">
-                <span className="material-symbols-outlined text-lg">person</span>
-              </div>
+              {user ? (
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md">
+                    <span className="material-symbols-outlined text-lg">person</span>
+                  </div>
+                  <div className="hidden sm:block text-left">
+                    <div className="text-sm font-medium text-on-surface">{user.display_name || user.email}</div>
+                    <div className="text-xs text-on-surface-variant font-mono">{user.email}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onLogout}
+                    className="px-3 py-1.5 text-sm font-medium text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors cursor-pointer border border-outline-variant/30"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}
+                  className="w-9 h-9 rounded-full bg-surface-container-high ring-2 ring-primary/40 flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md"
+                >
+                  <span className="material-symbols-outlined text-lg">person</span>
+                </button>
+              )}
               <span
                 className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-surface-container-lowest ${
                   isHealthy ? 'bg-secondary-container' : 'bg-outline'
@@ -143,6 +204,116 @@ export default function Navbar({ health, isHealthy, onToggleDrawer, onScrollToAu
                 className="px-5 py-2.5 rounded-lg bg-primary-container text-on-primary-container font-bold text-sm hover:shadow-[0_0_15px_rgba(0,229,255,0.4)] transition-all cursor-pointer"
               >
                 Understood
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Auth Modal */}
+      {showAuthModal && (
+        <div
+          className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          onClick={() => setShowAuthModal(false)}
+        >
+          <div
+            className="w-full max-w-md bg-surface-container-low border border-outline-variant/40 rounded-2xl p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-surface-container-high mb-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-2xl">{authMode === 'login' ? 'login' : 'person_add'}</span>
+                <h3 className="text-xl font-bold text-on-surface">{authMode === 'login' ? 'Sign In' : 'Create Account'}</h3>
+              </div>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+
+            {authError && (
+              <div className="mb-4 p-3 rounded-lg bg-error-container/20 border border-error/50 text-error text-sm font-mono">
+                {authError}
+              </div>
+            )}
+
+            <form onSubmit={handleAuthSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-on-surface-variant mb-1">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={authForm.email}
+                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                  className="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/40"
+                  placeholder="you@example.com"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-on-surface-variant mb-1">
+                  Password
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  required
+                  autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+                  minLength={8}
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                  className="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/40"
+                  placeholder="Min 8 characters"
+                />
+              </div>
+
+              {authMode === 'register' && (
+                <div>
+                  <label htmlFor="displayName" className="block text-sm font-medium text-on-surface-variant mb-1">
+                    Display Name (optional)
+                  </label>
+                  <input
+                    id="displayName"
+                    type="text"
+                    maxLength={64}
+                    value={authForm.displayName}
+                    onChange={(e) => setAuthForm({ ...authForm, displayName: e.target.value })}
+                    className="w-full h-10 px-3 rounded-lg bg-surface-container-low text-on-surface text-sm placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary border border-outline-variant/40"
+                    placeholder="Your name"
+                  />
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="w-full py-2.5 px-4 rounded-lg bg-primary-container text-on-primary-container font-bold text-sm hover:shadow-[0_0_15px_rgba(0,229,255,0.4)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {authLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="material-symbols-outlined animate-spin">sync</span>
+                    {authMode === 'login' ? 'Signing in...' : 'Creating account...'}
+                  </span>
+                ) : (
+                  authMode === 'login' ? 'Sign In' : 'Create Account'
+                )}
+              </button>
+            </form>
+
+            <div className="mt-4 text-center text-sm text-on-surface-variant">
+              <span>{authMode === 'login' ? "Don't have an account?" : 'Already have an account?'}</span>
+              <button
+                type="button"
+                onClick={switchAuthMode}
+                className="ml-2 text-primary font-medium hover:underline cursor-pointer"
+              >
+                {authMode === 'login' ? 'Sign up' : 'Sign in'}
               </button>
             </div>
           </div>
