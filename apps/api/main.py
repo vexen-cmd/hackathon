@@ -215,18 +215,39 @@ async def get_me(current_user: dict[str, Any] = Depends(get_current_user_require
 # ---------------------------------------------------------------------------
 # History Endpoints (user-scoped if authenticated)
 # ---------------------------------------------------------------------------
+def _local_history(limit: int, user_id: str | None) -> list[dict[str, Any]]:
+    runs = []
+    for request_id, session in reversed(list(STORE.items())):
+        if session.get("user_id") != user_id:
+            continue
+        proposal = session["proposal"]
+        snippet = session["snippet"]
+        runs.append({
+            "request_id": request_id,
+            "source_id": snippet.source_id,
+            "language_name": proposal.language.name,
+            "state": session["orchestrator"].sm.current.value,
+            "output_hash": proposal.output_hash,
+            "created_at": snippet.submitted_at.isoformat(),
+        })
+    return runs[:max(1, min(limit, 200))]
+
+
 @app.get("/api/history")
 async def history(
     limit: int = 50,
     current_user: dict[str, Any] | None = Depends(get_current_user_optional),
 ) -> list[dict[str, Any]]:
+    user_id = current_user["user_id"] if current_user else None
+    local_runs = _local_history(limit, user_id)
     if not persistence.enabled():
-        return []
+        return local_runs
 
     if current_user:
-        return await auth.list_user_history(current_user["user_id"], limit)
+        stored_runs = await auth.list_user_history(current_user["user_id"], limit)
     else:
-        return persistence.list_history(max(1, min(limit, 200)))
+        stored_runs = persistence.list_history(max(1, min(limit, 200)))
+    return stored_runs or local_runs
 
 
 # ---------------------------------------------------------------------------
@@ -252,11 +273,18 @@ async def analyze(
             raise HTTPException(503, reason)
         raise HTTPException(422, reason)
 
-    session = {"orchestrator": orchestrator, "proposal": proposal, "approval": None, "final_result": None, "snippet": snippet}
+    user_id = current_user["user_id"] if current_user else None
+    session = {
+        "orchestrator": orchestrator,
+        "proposal": proposal,
+        "approval": None,
+        "final_result": None,
+        "snippet": snippet,
+        "user_id": user_id,
+    }
     STORE[request_id] = session
 
     # Persist with user_id if authenticated
-    user_id = current_user["user_id"] if current_user else None
     await auth.save_session_with_user(session, user_id)
 
     return serialize(session)

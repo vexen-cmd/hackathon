@@ -37,6 +37,7 @@ export default function App() {
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (token) fetchUser(token);
+    else fetchHistory();
     refreshHealth();
   }, []);
 
@@ -49,8 +50,12 @@ export default function App() {
         fetchHistory(token);
       } else {
         localStorage.removeItem('auth_token');
+        fetchHistory();
       }
-    } catch { localStorage.removeItem('auth_token'); }
+    } catch {
+      localStorage.removeItem('auth_token');
+      fetchHistory();
+    }
   };
 
   const fetchHistory = async (token) => {
@@ -127,7 +132,7 @@ export default function App() {
       const response = await fetch('/api/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token && { 'Authorization': `Bearer ${token}` }) }, body: JSON.stringify({ code, source_id: `snippet-${Date.now()}` }) });
       const data = await safeJson(response); if (!response.ok) throw new Error(data.detail || data.error || 'Analysis failed.');
       setRequestId(data.request_id); setProposal(data.proposal); setExplanation(data.proposal?.explanation || ''); setDocumentation(data.proposal?.documentation || ''); setWorkflowState(data.state || 'awaiting_review'); setEvents(data.events || []); setEvidence(data.evidence || []);
-      if (token) fetchHistory(token);
+      fetchHistory(token);
       toast('Snippet analyzed.', 'success');
     } catch (error) { setWorkflowState('failed'); toast(error.message || 'Could not reach the harness.', 'error'); }
     finally { setIsAnalyzing(false); }
@@ -140,10 +145,10 @@ export default function App() {
       const response = await fetch(`/api/${requestId}/review`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token && { 'Authorization': `Bearer ${token}` }) }, body: JSON.stringify({ approver_id: approverId || 'local-reviewer', decision, edited_explanation: null, edited_documentation: null }) });
       const data = await safeJson(response); if (!response.ok) throw new Error(data.detail || data.error || 'Review failed.');
       setEvents(data.events || []);
-      if (decision === 'reject') { setWorkflowState('rejected'); toast('Proposal rejected.', 'warning'); return; }
+      if (decision === 'reject') { setWorkflowState('rejected'); fetchHistory(token); toast('Proposal rejected.', 'warning'); return; }
       const formatResponse = await fetch(`/api/${requestId}/format`, { method: 'POST', headers: { ...(token && { 'Authorization': `Bearer ${token}` }) } }); const formatted = await safeJson(formatResponse);
       if (!formatResponse.ok) throw new Error(formatted.detail || formatted.error || 'Formatting failed.');
-      setFinalResult(formatted.final_result); setMarkdown(formatted.markdown || ''); setWorkflowState('delivered'); toast('README.md delivered.', 'success');
+      setFinalResult(formatted.final_result); setMarkdown(formatted.markdown || ''); setWorkflowState('delivered'); fetchHistory(token); toast('README.md delivered.', 'success');
     } catch (error) { toast(error.message || 'Review could not be completed.', 'error'); }
     finally { setIsReviewing(false); }
   };
