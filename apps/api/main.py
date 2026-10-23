@@ -170,9 +170,12 @@ async def register(body: RegisterRequest) -> TokenResponse:
     if not persistence.enabled():
         raise HTTPException(503, "Supabase not configured")
 
-    user = await auth.create_user(body.email, body.password, body.display_name)
-    if not user:
-        raise HTTPException(400, "Registration failed")
+    try:
+        user = await auth.create_user(body.email, body.password, body.display_name)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
 
     token = auth.create_access_token(user["user_id"], user["email"])
     return TokenResponse(

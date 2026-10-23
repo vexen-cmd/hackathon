@@ -2,27 +2,35 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import secrets
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import httpx
 import jwt
+from dotenv import load_dotenv
 from passlib.hash import argon2
 
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-JWT_SECRET = os.getenv("JWT_SECRET", "").strip()
-if not JWT_SECRET:
-    # Generate a persistent secret if not set (dev only)
-    JWT_SECRET = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
-    print(f"[auth] WARNING: JWT_SECRET not set in env, using generated secret")
+JWT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+
+
+def _load_jwt_secret() -> str:
+    load_dotenv(JWT_ENV_FILE)
+    secret = os.getenv("JWT_SECRET", "").strip()
+    if not secret:
+        raise RuntimeError("JWT_SECRET is required; set it in the environment or repository .env file.")
+    return secret
+
+
+JWT_SECRET = _load_jwt_secret()
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_SECONDS = 7 * 24 * 60 * 60  # 7 days
@@ -100,7 +108,7 @@ async def create_user(email: str, password: str, display_name: str = "") -> dict
     """Create a new user in Supabase. Returns user dict or None on failure."""
     config = persistence._config()
     if config is None:
-        return None
+        raise RuntimeError("Supabase not configured")
 
     user_id = secrets.token_hex(16)
     password_hash = hash_password(password)
@@ -123,8 +131,8 @@ async def create_user(email: str, password: str, display_name: str = "") -> dict
         if e.response.status_code == 409:
             raise ValueError("Email already registered")
         raise
-    except Exception:
-        return None
+    except Exception as e:
+        raise RuntimeError(f"Registration failed: {e}") from e
 
 
 async def get_user_by_email(email: str) -> dict[str, Any] | None:
@@ -132,7 +140,6 @@ async def get_user_by_email(email: str) -> dict[str, Any] | None:
     config = persistence._config()
     if config is None:
         return None
-
     try:
         with persistence._client(*config) as client:
             response = client.get(
@@ -266,7 +273,6 @@ async def save_session_with_user(session: dict[str, Any], user_id: str | None) -
                 "explanation": proposal["explanation"],
                 "documentation": proposal["documentation"],
                 "output_hash": proposal["output_hash"],
-                "tags": proposal.get("tags", []),
             }, "request_id")
 
             chained = {

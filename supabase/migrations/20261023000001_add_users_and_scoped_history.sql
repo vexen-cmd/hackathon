@@ -129,7 +129,6 @@ select
   r.state,
   r.language_name,
   r.output_hash,
-  r.tags,
   r.created_at,
   a.decision,
   f.event_chain_verified

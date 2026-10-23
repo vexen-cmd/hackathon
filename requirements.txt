@@ -10,3 +10,4 @@ markdown
 passlib[argon2]
 PyJWT
 python-jose[cryptography]
+python-dotenv

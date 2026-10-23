@@ -32,7 +32,13 @@ def enabled() -> bool:
 def _client(url: str, key: str) -> httpx.Client:
     return httpx.Client(
         base_url=f"{url}/rest/v1",
-        headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Accept-Profile": "public",
+            "Content-Profile": "public",
+        },
         timeout=TIMEOUT,
         transport=_transport,
     )

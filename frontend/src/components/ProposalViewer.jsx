@@ -23,6 +23,7 @@ export default function ProposalViewer({
   const isApproved = workflowState === 'approved' || isDelivered;
   const isRejected = workflowState === 'rejected';
   const hasProposal = Boolean(proposal);
+  const tags = Array.isArray(proposal?.tags) ? proposal.tags : [];
 
   const untrustedItems = evidence.filter((e) => e.trust === 'untrusted');
   const hasAdversarialTaint = untrustedItems.some((e) => e.extracted?.matched_phrase);
