@@ -99,7 +99,35 @@ export default function App() {
     <HistoryDrawer isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} historyRuns={historyRuns} onSelectRun={selectRun} onNewChat={newChat} currentRequestId={requestId} workflowState={workflowState} />
     <main className="dashboard-main pl-0 lg:pl-80 min-h-screen bg-background pt-20 px-5 lg:px-8"><div className="dashboard-content w-full pb-16">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6"><div><div className="flex items-center gap-2 mb-2"><span className="text-xs font-mono font-bold text-primary px-2.5 py-1 rounded bg-surface-container-high border border-primary/25">ENCLAVE HARNESS</span><span className="text-xs font-mono text-on-surface-variant">{requestId ? `SESSION: ${requestId.slice(0, 12)}` : 'SESSION: Awaiting submission'}</span></div><h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Zero-Trust Snippet Explainer</h1></div><div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-container border border-outline-variant/30 text-xs font-mono"><span className={isHealthy ? 'text-secondary' : 'text-error'}>●</span>{isHealthy ? 'Ollama connected' : 'Engine offline'}<span className="text-outline">/</span><span className="text-primary uppercase">{workflowState}</span></div></div>
-      <div className="dashboard-grid"><div className="editor-pane"><CodeEditor code={code} setCode={setCode} onAnalyze={analyze} isAnalyzing={isAnalyzing} currentPreset={currentPreset} onSelectPreset={selectPreset} activeFilename={activeFilename} setActiveFilename={setActiveFilename} /></div><div className="inspector-pane"><ProposalViewer proposal={proposal} workflowState={workflowState} requestId={requestId} onReview={review} onSimulateStaleAttack={staleAttack} isReviewing={isReviewing} explanation={explanation} setExplanation={setExplanation} documentation={documentation} setDocumentation={setDocumentation} evidence={evidence} /></div></div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch gap-6">
+        <div className="h-full flex flex-col min-h-0">
+          <CodeEditor
+            code={code}
+            setCode={setCode}
+            onAnalyze={analyze}
+            isAnalyzing={isAnalyzing}
+            currentPreset={currentPreset}
+            onSelectPreset={selectPreset}
+            activeFilename={activeFilename}
+            setActiveFilename={setActiveFilename}
+          />
+        </div>
+        <div className="h-full flex flex-col min-h-0">
+          <ProposalViewer
+            proposal={proposal}
+            workflowState={workflowState}
+            requestId={requestId}
+            onReview={review}
+            onSimulateStaleAttack={staleAttack}
+            isReviewing={isReviewing}
+            explanation={explanation}
+            setExplanation={setExplanation}
+            documentation={documentation}
+            setDocumentation={setDocumentation}
+            evidence={evidence}
+          />
+        </div>
+      </div>
       {finalResult && <DeliveredResult finalResult={finalResult} markdown={markdown} />}
       <AuditTrail events={events} evidence={evidence} />
     </div></main><Toast toasts={toasts} onDismiss={(id) => setToasts((items) => items.filter((item) => item.id !== id))} />

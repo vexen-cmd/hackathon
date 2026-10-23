@@ -146,7 +146,7 @@ export default function CodeEditor({
   };
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="h-full flex flex-col gap-5">
       {/* Preset Controller Strip */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-low p-3 rounded-xl shadow-md border border-outline-variant/30">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0" id="preset-strip">
@@ -220,7 +220,7 @@ export default function CodeEditor({
       </div>
 
       {/* VS Code / Terminal Editor Window */}
-      <div className="flex flex-col rounded-xl overflow-hidden bg-surface-container-low shadow-2xl border border-outline-variant/30">
+      <div className="flex flex-col flex-1 rounded-xl overflow-hidden bg-surface-container-low shadow-2xl border border-outline-variant/30 min-h-0">
         {/* Editor Window Titlebar */}
         <div className="px-4 py-3 bg-surface-container flex items-center justify-between border-b border-outline-variant/20">
           <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export default function CodeEditor({
         </div>
 
         {/* Code Content Block with Synchronized Line Numbers */}
-        <div className="relative flex overflow-x-auto p-4 bg-surface-container-lowest font-mono min-h-[520px]">
+        <div className="relative flex flex-1 overflow-x-auto p-4 bg-surface-container-lowest font-mono min-h-[520px]">
           {/* Line Numbers Column */}
           <div className="select-none text-right pr-4 text-outline-variant font-mono text-sm leading-7 space-y-0 text-opacity-70 flex flex-col items-end border-r border-outline-variant/20 mr-4">
             {lines.map((_, i) => (

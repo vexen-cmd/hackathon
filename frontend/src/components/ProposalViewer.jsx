@@ -57,7 +57,7 @@ export default function ProposalViewer({
   };
 
   return (
-    <div className="flex flex-col gap-5 scroll-mt-20" id="analysis-results">
+    <div className="flex h-full min-h-0 flex-col gap-5 scroll-mt-20" id="analysis-results">
       {/* Top Status Pipeline Tracker */}
       <div className="p-4 bg-surface-container-low rounded-xl shadow-md border border-outline-variant/30">
         <div className="flex items-center justify-between mb-3">
@@ -141,7 +141,7 @@ export default function ProposalViewer({
 
       {!hasProposal ? (
         /* Empty State */
-        <div className="p-8 bg-surface-container rounded-xl shadow-xl border border-outline-variant/30 text-center flex flex-col items-center justify-center min-h-[380px]">
+        <div className="p-8 bg-surface-container rounded-xl shadow-xl border border-outline-variant/30 text-center flex flex-col items-center justify-center min-h-[380px] flex-1">
           <div className="w-14 h-14 rounded-2xl bg-surface-container-high border border-primary/30 flex items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(0,229,255,0.15)]">
             <span className="material-symbols-outlined text-3xl">security</span>
           </div>
