@@ -1,0 +1,26 @@
+@layer base { html, body { margin: 0; padding: 0; background: #11131c; color: #e1e1ef; font-family: Inter, sans-serif; } body { overscroll-behavior: none; } }
+::-webkit-scrollbar { width: 7px; height: 7px; } ::-webkit-scrollbar-track { background: #0c0e17; } ::-webkit-scrollbar-thumb { background: #3b494c; border-radius: 4px; }
+.material-symbols-outlined { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; line-height: 1; display: inline-block; vertical-align: middle; }
+code, pre, textarea { font-family: 'JetBrains Mono', monospace !important; }
+.markdown-body { color: #e1e1ef; line-height: 1.7; }.markdown-body h1,.markdown-body h2,.markdown-body h3 { color: #c3f5ff; }.markdown-body pre { background: #0c0e17; border: 1px solid #3b494c; border-radius: 8px; padding: 1rem; overflow-x: auto; }
+@keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }.toast-animate { animation: slideInRight .25s ease-out forwards; }
+.dashboard-content { max-width: 1440px; margin: 0 auto; }.dashboard-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; align-items: start; }.editor-pane, .inspector-pane { min-width: 0; }
+@media (min-width: 1024px) { #history-drawer { width: 19rem; }.dashboard-main { padding-left: 19rem !important; }.composer-area { left: 19rem; } }
+@media (max-width: 1180px) { .dashboard-grid { grid-template-columns: minmax(0, 1fr); }.inspector-pane { max-width: 860px; } }
+@media (max-width: 640px) { .dashboard-main { padding-top: 5rem; }.dashboard-content { padding-bottom: 2rem; }.dashboard-grid { gap: 1rem; } }
+@media (min-width: 1024px) { #root { zoom: .8; } }
+
+/* Keep the editor and proposal columns equal in the desktop workbench. */
+@media (min-width: 1181px) {
+  .dashboard-grid {
+    align-items: stretch;
+  }
+
+  .editor-pane,
+  .inspector-pane,
+  .editor-pane > div,
+  .inspector-pane > div {
+    height: 100%;
+    min-height: 0;
+  }
+}
