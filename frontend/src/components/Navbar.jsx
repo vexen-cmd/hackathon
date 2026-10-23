@@ -16,6 +16,15 @@ export default function Navbar({
   const [authForm, setAuthForm] = useState({ email: '', password: '', displayName: '' });
   const [authError, setAuthError] = useState('');
   const [authLoading, setAuthLoading] = useState(false);
+  const [showProfileCard, setShowProfileCard] = useState(false);
+
+  useEffect(() => {
+    // Reveal the profile immediately after login or registration.
+    setShowProfileCard(Boolean(user));
+  }, [user]);
+
+  const profileName = user?.display_name?.trim() || user?.email?.split('@')[0] || 'User';
+  const profileInitial = profileName.charAt(0).toUpperCase();
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -109,12 +118,18 @@ export default function Navbar({
 
             <div className="relative flex items-center pl-1">
               {user ? (
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md">
-                    <span className="material-symbols-outlined text-lg">person</span>
-                  </div>
+                <div className="relative flex items-center gap-3">
+                  <button
+                    type="button"
+                    aria-label="Open profile"
+                    aria-expanded={showProfileCard}
+                    onClick={() => setShowProfileCard((open) => !open)}
+                    className="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md cursor-pointer ring-2 ring-primary/30"
+                  >
+                    {profileInitial}
+                  </button>
                   <div className="hidden sm:block text-left">
-                    <div className="text-sm font-medium text-on-surface">{user.display_name || user.email}</div>
+                    <div className="text-sm font-medium text-on-surface">{profileName}</div>
                     <div className="text-xs text-on-surface-variant font-mono">{user.email}</div>
                   </div>
                   <button
@@ -124,6 +139,24 @@ export default function Navbar({
                   >
                     Logout
                   </button>
+
+                  {showProfileCard && (
+                    <div className="absolute right-0 top-12 z-50 w-72 rounded-xl bg-surface-container border border-primary/30 shadow-2xl p-4">
+                      <div className="flex items-center gap-3 pb-3 border-b border-outline-variant/30">
+                        <div className="w-12 h-12 rounded-full bg-primary-container flex items-center justify-center text-primary font-bold text-lg">
+                          {profileInitial}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-on-surface truncate">{profileName}</p>
+                          <p className="text-xs text-on-surface-variant font-mono truncate">{user.email}</p>
+                        </div>
+                      </div>
+                      <div className="pt-3 text-xs font-mono text-secondary flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-secondary"></span>
+                        Signed in profile
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <button

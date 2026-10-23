@@ -104,7 +104,12 @@ export default function App() {
     const response = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
     const data = await safeJson(response); if (!response.ok) throw new Error(data.detail);
     localStorage.setItem('auth_token', data.token);
-    setUser(data);
+    // Fetch the canonical profile after authentication so the UI uses the
+    // saved given/display name instead of relying on the login payload alone.
+    const profileResponse = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${data.token}` } });
+    const profile = await safeJson(profileResponse);
+    if (!profileResponse.ok) throw new Error(profile.detail || 'Could not load your profile.');
+    setUser(profile);
     fetchHistory(data.token);
     toast('Logged in successfully', 'success');
   };
@@ -112,7 +117,10 @@ export default function App() {
     const response = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, display_name: displayName }) });
     const data = await safeJson(response); if (!response.ok) throw new Error(data.detail);
     localStorage.setItem('auth_token', data.token);
-    setUser(data);
+    const profileResponse = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${data.token}` } });
+    const profile = await safeJson(profileResponse);
+    if (!profileResponse.ok) throw new Error(profile.detail || 'Could not load your profile.');
+    setUser(profile);
     fetchHistory(data.token);
     toast('Account created', 'success');
   };

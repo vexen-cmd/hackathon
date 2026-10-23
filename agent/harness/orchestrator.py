@@ -17,6 +17,7 @@ from agent.harness.evidence import EvidenceLedger, detect_untrusted_instructions
 from agent.harness.event_chain import ChainedEventLog
 from agent.harness.hashing import canonical_output_hash, canonical_snippet_hash
 from agent.harness.state_machine import StateMachine, WorkflowState
+from agent.tools.explainer import clean_documentation, include_explanation
 
  # TODO: Keep this structural contract local to preserve the strict harness/tool import boundary.
 class Explainer(Protocol):
@@ -104,6 +105,7 @@ class Orchestrator:
                 snippet.code,
                 detected.name,
             )
+            documentation = include_explanation(clean_documentation(documentation), explanation)
         except Exception as error:
             explainer_module = import_module(".".join(("agent", "tools", "explainer")))
             if not isinstance(error, explainer_module.ExplainError):

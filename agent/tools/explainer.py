@@ -1,4 +1,24 @@
+import re
 from typing import Protocol
+
+
+def clean_documentation(documentation: str) -> str:
+    """Keep delivered output focused on snippet documentation, not project trees."""
+    section_pattern = re.compile(
+        r"(?ims)^\s{0,3}#{1,6}\s*(?:code\s+structure|project\s+structure)\s*\n"
+        r".*?(?=^\s{0,3}#{1,6}\s+|\Z)"
+    )
+    return section_pattern.sub("", documentation).strip()
+
+
+def include_explanation(documentation: str, explanation: str) -> str:
+    """Make the delivered Markdown self-contained by including the explanation."""
+    explanation_section = re.compile(
+        r"(?ims)^\s{0,3}#{1,6}\s*explanation\s*:?[ \t]*\n"
+        r".*?(?=^\s{0,3}#{1,6}\s+|\Z)"
+    )
+    without_existing = explanation_section.sub("", documentation).strip()
+    return f"## Explanation\n\n{explanation.strip()}\n\n{without_existing}".strip()
 
 
 class Explainer(Protocol):

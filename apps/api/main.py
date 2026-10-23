@@ -12,6 +12,7 @@ from fastapi import Depends, FastAPI, HTTPException, Header, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
 from pydantic import BaseModel, EmailStr, Field
 
 from agent.harness.approval import StaleApproval, apply_edits, make_approval_receipt
@@ -37,6 +38,7 @@ app.add_middleware(
 
 STORE: dict[str, dict[str, Any]] = {}
 ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(ROOT / ".env")
 INDEX = ROOT / "frontend" / "dist" / "index.html"
 ASSETS_DIR = ROOT / "frontend" / "dist" / "assets"
 if ASSETS_DIR.exists():
@@ -104,11 +106,11 @@ async def get_current_user_required(authorization: str | None = Header(None)) ->
 def build_explainer() -> Explainer:
     """Pick the explainer backend from the environment.
 
-    EXPLAINER=stub   -> StubExplainer (offline, deterministic; default)
+    EXPLAINER=stub   -> StubExplainer (offline, deterministic)
     EXPLAINER=ollama -> LocalExplainer (needs a running Ollama server)
     EXPLAINER=gemini -> GeminiExplainer (needs GEMINI_API_KEY)
     """
-    backend = os.getenv("EXPLAINER", "stub").strip().lower()
+    backend = (os.getenv("EXPLAINER") or ("ollama" if os.getenv("OLLAMA_HOST") else "stub")).strip().lower()
     if backend == "ollama":
         return LocalExplainer(host=os.environ["OLLAMA_HOST"]) if os.getenv("OLLAMA_HOST") else LocalExplainer()
     if backend == "gemini":
@@ -157,7 +159,7 @@ def health() -> dict[str, str]:
     return {
         "status": "ok",
         "ollama_host": os.getenv("OLLAMA_HOST", "http://localhost:11434"),
-        "explainer": os.getenv("EXPLAINER", "stub"),
+        "explainer": os.getenv("EXPLAINER") or ("ollama" if os.getenv("OLLAMA_HOST") else "stub"),
         "supabase": "enabled" if persistence.enabled() else "disabled",
     }
 
