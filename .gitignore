@@ -1,0 +1,35 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+.pytest_cache/
+venv/
+.venv/
+.DS_Store
+data/test_results/*.json
+*.sqlite3
+
+# Node / frontend dependencies and build output
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+.next/
+.vite/
+coverage/
+
+# Python tooling and virtual environments
+.mypy_cache/
+.ruff_cache/
+.tox/
+*.egg-info/
+
+# Local editor and OS files
+.idea/
+.vscode/
+*.swp
+Thumbs.db
