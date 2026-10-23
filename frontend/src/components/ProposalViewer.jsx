@@ -1,16 +1,4 @@
 import React, { useState } from 'react';
-import {
-  FileText,
-  Hash,
-  CheckCircle,
-  XCircle,
-  AlertTriangle,
-  Lock,
-  Edit3,
-  Copy,
-  Check,
-  RotateCcw,
-} from 'lucide-react';
 
 export default function ProposalViewer({
   proposal,
@@ -23,211 +11,432 @@ export default function ProposalViewer({
   setExplanation,
   documentation,
   setDocumentation,
+  evidence = [],
 }) {
   const [approverId, setApproverId] = useState('reviewer-human');
+  const [isEditingExpl, setIsEditingExpl] = useState(false);
+  const [isEditingDoc, setIsEditingDoc] = useState(false);
+  const [copiedDoc, setCopiedDoc] = useState(false);
   const [copiedHash, setCopiedHash] = useState(false);
 
-  const copyHash = async () => {
-    if (!proposal?.output_hash) return;
+  const isDelivered = workflowState === 'delivered';
+  const isApproved = workflowState === 'approved' || isDelivered;
+  const isRejected = workflowState === 'rejected';
+  const hasProposal = Boolean(proposal);
+
+  const untrustedItems = evidence.filter((e) => e.trust === 'untrusted');
+  const hasAdversarialTaint = untrustedItems.some((e) => e.extracted?.matched_phrase);
+
+  const copyDocumentation = async () => {
     try {
-      await navigator.clipboard.writeText(proposal.output_hash);
-      setCopiedHash(true);
-      setTimeout(() => setCopiedHash(false), 2000);
+      await navigator.clipboard.writeText(documentation || proposal?.documentation || '');
+      setCopiedDoc(true);
+      setTimeout(() => setCopiedDoc(false), 1500);
     } catch {
       // ignore
     }
   };
 
-  const isDelivered = workflowState === 'delivered';
-  const isRejected = workflowState === 'rejected';
-  const isAwaitingReview = workflowState === 'awaiting_review' || workflowState === 'proposing_docs';
+  const copyMerkleHash = async () => {
+    if (!proposal?.output_hash) return;
+    try {
+      await navigator.clipboard.writeText(proposal.output_hash);
+      setCopiedHash(true);
+      setTimeout(() => setCopiedHash(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
 
-  if (!proposal) {
-    return (
-      <div className="workbench-card">
-        <div className="card-header">
-          <div className="card-title-group">
-            <span className="step-indicator">02</span>
-            <h2 className="card-title">Harness Proposal</h2>
-          </div>
-          <span className="status-step-pill">READY</span>
-        </div>
-
-        <div className="empty-placeholder">
-          <div className="empty-icon-wrap">
-            <FileText size={28} />
-          </div>
-          <div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 600, color: '#f1f5f9', marginBottom: '0.25rem' }}>
-              No Proposal Generated Yet
-            </h3>
-            <p style={{ fontSize: '0.825rem', color: '#64748b', maxWidth: '340px' }}>
-              Paste a snippet on the left and select <strong>Analyze Snippet</strong>. The deterministic harness will isolate untrusted model output into a reviewable proposal.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const getPipelineStatus = () => {
+    if (isDelivered) return 'STAGE 4/4 COMPLETED';
+    if (isApproved) return 'STAGE 3/4 APPROVED';
+    if (hasProposal) return 'STAGE 3/4 AWAITING SIGN';
+    if (workflowState === 'analyzing') return 'STAGE 1/4 ANALYZING';
+    return 'STAGE 0/4 IDLE';
+  };
 
   return (
-    <div className="workbench-card">
-      <div className="card-header">
-        <div className="card-title-group">
-          <span className="step-indicator">02</span>
-          <h2 className="card-title">Harness Proposal</h2>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span className={`status-step-pill ${isDelivered ? 'complete' : isRejected ? 'failed' : 'active'}`}>
-            {workflowState.toUpperCase()}
+    <div className="flex flex-col gap-5 scroll-mt-20" id="analysis-results">
+      {/* Top Status Pipeline Tracker */}
+      <div className="p-4 bg-surface-container-low rounded-xl shadow-md border border-outline-variant/30">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-mono font-bold tracking-wider text-on-surface-variant uppercase">
+            HARNESS PIPELINE STATE
+          </span>
+          <span
+            className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase ${
+              isDelivered ? 'text-primary bg-primary-container/15' : 'text-secondary bg-secondary-container/15'
+            }`}
+            id="pipeline-overall-status"
+          >
+            {getPipelineStatus()}
           </span>
         </div>
+
+        <div className="grid grid-cols-4 gap-2">
+          {/* Step 1: Detected */}
+          <div
+            className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-center transition-colors ${
+              hasProposal ? 'bg-secondary-container/20 text-secondary' : 'bg-surface-container opacity-60 text-outline'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg mb-1">
+              {hasProposal ? 'check_circle' : 'radio_button_unchecked'}
+            </span>
+            <span className="text-[11px] font-mono font-bold">1. DETECTED</span>
+          </div>
+
+          {/* Step 2: Explained */}
+          <div
+            className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-center transition-colors ${
+              hasProposal ? 'bg-secondary-container/20 text-secondary' : 'bg-surface-container opacity-60 text-outline'
+            }`}
+          >
+            <span className="material-symbols-outlined text-lg mb-1">
+              {hasProposal ? 'check_circle' : 'radio_button_unchecked'}
+            </span>
+            <span className="text-[11px] font-mono font-bold">2. EXPLAINED</span>
+          </div>
+
+          {/* Step 3: Approved */}
+          <div
+            className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-center transition-colors ${
+              isApproved
+                ? 'bg-secondary-container/20 text-secondary'
+                : hasProposal
+                ? 'bg-tertiary-container/20 text-tertiary-fixed-dim shadow-[0_0_12px_rgba(255,186,56,0.25)]'
+                : 'bg-surface-container opacity-60 text-outline'
+            }`}
+            id="badge-approved"
+          >
+            <span
+              className={`material-symbols-outlined text-lg mb-1 ${
+                !isApproved && hasProposal ? 'animate-bounce text-tertiary-fixed-dim' : ''
+              }`}
+            >
+              {isApproved ? 'check_circle' : hasProposal ? 'lock_clock' : 'radio_button_unchecked'}
+            </span>
+            <span className="text-[11px] font-mono font-bold">
+              {isApproved ? '3. APPROVED' : '3. PENDING'}
+            </span>
+          </div>
+
+          {/* Step 4: Delivered */}
+          <div
+            className={`flex flex-col items-center justify-center p-2.5 rounded-lg text-center transition-colors ${
+              isDelivered
+                ? 'bg-primary-container/25 text-primary shadow-[0_0_12px_rgba(0,229,255,0.25)]'
+                : 'bg-surface-container opacity-60 text-outline'
+            }`}
+            id="badge-delivered"
+          >
+            <span className="material-symbols-outlined text-lg mb-1">
+              {isDelivered ? 'verified' : 'radio_button_unchecked'}
+            </span>
+            <span className="text-[11px] font-mono font-bold">4. DELIVERED</span>
+          </div>
+        </div>
       </div>
 
-      {/* Proposal Metadata */}
-      <div className="proposal-body">
-        <div className="proposal-meta-row">
-          <div className="meta-field">
-            <span className="meta-label">Detected Language:</span>
-            <strong style={{ color: '#38bdf8' }}>{proposal.language?.name || 'Unknown'}</strong>
-            {proposal.language?.confidence && (
-              <span style={{ fontSize: '0.72rem', color: '#94a3b8' }}>
-                ({Math.round(proposal.language.confidence * 100)}% conf)
-              </span>
-            )}
+      {!hasProposal ? (
+        /* Empty State */
+        <div className="p-8 bg-surface-container rounded-xl shadow-xl border border-outline-variant/30 text-center flex flex-col items-center justify-center min-h-[380px]">
+          <div className="w-14 h-14 rounded-2xl bg-surface-container-high border border-primary/30 flex items-center justify-center text-primary mb-4 shadow-[0_0_20px_rgba(0,229,255,0.15)]">
+            <span className="material-symbols-outlined text-3xl">security</span>
           </div>
-
-          <div className="meta-field">
-            <span className="meta-label">Output Hash:</span>
-            <div className="hash-badge" title="Canonical SHA-256 bound to approval">
-              <Hash size={12} />
-              <span>{proposal.output_hash?.slice(0, 16)}...</span>
+          <h3 className="text-xl font-bold text-on-surface mb-2">
+            Enclave Harness Standing By
+          </h3>
+          <p className="text-on-surface-variant text-sm max-w-md mb-6 leading-relaxed font-sans">
+            Submit a code snippet on the left and select{' '}
+            <strong className="text-primary font-semibold">Analyze Snippet</strong>. Untrusted LLM output will be isolated into a reviewable proposal awaiting your cryptographic sign-off.
+          </p>
+          <div className="grid grid-cols-2 gap-3 w-full max-w-sm text-left">
+            <div className="p-3 rounded-lg bg-surface-container-low border border-outline-variant/30">
+              <span className="text-xs font-mono font-bold text-secondary flex items-center gap-1.5 mb-1">
+                <span className="material-symbols-outlined text-sm">lock</span>
+                CE-TC3 Hash Binding
+              </span>
+              <p className="text-xs text-on-surface-variant">Approval binds to the canonical output hash.</p>
+            </div>
+            <div className="p-3 rounded-lg bg-surface-container-low border border-outline-variant/30">
+              <span className="text-xs font-mono font-bold text-primary flex items-center gap-1.5 mb-1">
+                <span className="material-symbols-outlined text-sm">shield</span>
+                CE-TC4 Isolation
+              </span>
+              <p className="text-xs text-on-surface-variant">Untrusted strings quarantined in evidence ledger.</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* AI Explanation Card */}
+          <div className="p-5 bg-surface-container rounded-xl shadow-lg relative flex flex-col gap-3 border border-outline-variant/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-lg bg-primary/10 text-primary">
+                  <span className="material-symbols-outlined text-lg">psychology</span>
+                </span>
+                <h2 className="text-base font-bold text-on-surface">
+                  AI Explanation
+                </h2>
+              </div>
               <button
+                className="text-xs font-mono font-bold text-primary hover:text-on-surface flex items-center gap-1 transition-colors cursor-pointer px-2.5 py-1 rounded bg-surface-container-high border border-primary/25"
+                onClick={() => setIsEditingExpl(!isEditingExpl)}
                 type="button"
-                onClick={copyHash}
-                style={{ background: 'none', border: 'none', color: '#93c5fd', cursor: 'pointer', padding: 0 }}
               >
-                {copiedHash ? <Check size={12} color="#34d399" /> : <Copy size={12} />}
+                <span className="material-symbols-outlined text-sm">edit_note</span>
+                <span>{isEditingExpl ? 'Save & Close' : 'Edit Explanation'}</span>
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Explanation Field */}
-        <div className="field-group">
-          <div className="field-header">
-            <label className="field-title" htmlFor="explanation-input">
-              Explanation <span style={{ color: '#64748b' }}>(Untrusted LLM Proposal)</span>
-            </label>
-            {isAwaitingReview && (
-              <span className="field-edit-note">
-                <Edit3 size={11} style={{ display: 'inline', marginRight: 3 }} />
-                Editable
-              </span>
-            )}
-          </div>
-          <textarea
-            id="explanation-input"
-            className="text-input-field explanation-field"
-            rows={5}
-            value={explanation}
-            onChange={(e) => setExplanation(e.target.value)}
-            disabled={!isAwaitingReview || isReviewing}
-            placeholder="Generated explanation will appear here..."
-          />
-        </div>
-
-        {/* Documentation Field */}
-        <div className="field-group">
-          <div className="field-header">
-            <label className="field-title" htmlFor="documentation-input">
-              Documentation Proposal
-            </label>
-            {isAwaitingReview && (
-              <span className="field-edit-note">
-                <Edit3 size={11} style={{ display: 'inline', marginRight: 3 }} />
-                Editable
-              </span>
-            )}
-          </div>
-          <textarea
-            id="documentation-input"
-            className="text-input-field documentation-field"
-            rows={10}
-            value={documentation}
-            onChange={(e) => setDocumentation(e.target.value)}
-            disabled={!isAwaitingReview || isReviewing}
-            placeholder="Generated documentation will appear here..."
-          />
-        </div>
-
-        {/* Human Review Panel */}
-        {isAwaitingReview && (
-          <div className="review-panel">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#f59e0b', fontSize: '0.8rem', fontWeight: 600 }}>
-              <Lock size={14} />
-              <span>CRYPTOGRAPHIC HUMAN APPROVAL GATEWAY</span>
-            </div>
-
-            <div className="review-input-row">
-              <label htmlFor="approver-id-input">Reviewer ID:</label>
-              <input
-                id="approver-id-input"
-                className="approver-input"
-                value={approverId}
-                onChange={(e) => setApproverId(e.target.value)}
-                placeholder="e.g. security-lead-1"
-                disabled={isReviewing}
+            {isEditingExpl ? (
+              <textarea
+                className="w-full h-32 p-3 rounded-lg bg-surface-container-lowest text-on-surface font-mono text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary resize-none border border-outline-variant/40"
+                value={explanation}
+                onChange={(e) => setExplanation(e.target.value)}
               />
+            ) : (
+              <div className="text-sm font-sans text-on-surface-variant leading-relaxed">
+                <p className="text-on-surface">
+                  {explanation || proposal.explanation || 'No explanation generated.'}
+                </p>
+              </div>
+            )}
+
+            {/* Dynamic Metric Ribbon based on actual proposal data */}
+            <div className="grid grid-cols-2 gap-3 pt-2 border-t border-outline-variant/20">
+              <div className="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between border border-outline-variant/20">
+                <span className="text-xs font-mono font-medium text-outline">Detected Language</span>
+                <span className="text-sm font-mono text-primary font-bold flex items-center gap-1">
+                  {proposal.language?.name || 'Unknown'}
+                  {proposal.language?.confidence ? ` (${Math.round(proposal.language.confidence * 100)}%)` : ''}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-surface-container-low flex items-center justify-between border border-outline-variant/20">
+                <span className="text-xs font-mono font-medium text-outline">Evidence Taint</span>
+                <span
+                  className={`text-sm font-mono font-bold ${
+                    hasAdversarialTaint ? 'text-error' : 'text-secondary'
+                  }`}
+                >
+                  {hasAdversarialTaint ? 'Adversarial Flagged' : 'Zero Taints'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Generated Documentation Card */}
+          <div className="p-5 bg-surface-container rounded-xl shadow-lg flex flex-col gap-3 border border-outline-variant/30">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="p-2 rounded-lg bg-secondary/10 text-secondary">
+                  <span className="material-symbols-outlined text-lg">description</span>
+                </span>
+                <h2 className="text-base font-bold text-on-surface">
+                  Generated Documentation
+                </h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  className="text-xs font-mono font-bold text-on-surface-variant hover:text-on-surface flex items-center gap-1.5 transition-colors cursor-pointer px-2.5 py-1 rounded bg-surface-container-high border border-outline-variant/30"
+                  onClick={copyDocumentation}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-sm">
+                    {copiedDoc ? 'done' : 'content_copy'}
+                  </span>
+                  <span>{copiedDoc ? 'Copied' : 'Copy'}</span>
+                </button>
+                <button
+                  className="text-xs font-mono font-bold text-primary hover:text-on-surface flex items-center gap-1 transition-colors cursor-pointer px-2.5 py-1 rounded bg-surface-container-high border border-primary/25"
+                  onClick={() => setIsEditingDoc(!isEditingDoc)}
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-sm">edit</span>
+                  <span>{isEditingDoc ? 'Done' : 'Edit'}</span>
+                </button>
+              </div>
             </div>
 
-            <div className="review-actions-bar">
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => onReview({ decision: 'reject', approverId })}
-                disabled={isReviewing || !approverId.trim()}
-              >
-                <XCircle size={15} /> Reject
-              </button>
+            {isEditingDoc ? (
+              <textarea
+                className="w-full h-36 p-3 rounded-lg bg-surface-container-lowest text-on-surface font-mono text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary resize-none border border-outline-variant/40"
+                value={documentation}
+                onChange={(e) => setDocumentation(e.target.value)}
+              />
+            ) : (
+              <div className="p-3.5 rounded-lg bg-surface-container-lowest font-mono text-xs text-on-surface-variant leading-relaxed overflow-x-auto whitespace-pre-wrap max-h-52 overflow-y-auto border border-outline-variant/20">
+                {documentation || proposal.documentation}
+              </div>
+            )}
+          </div>
 
-              <button
-                type="button"
-                className="btn btn-warning"
-                onClick={() => onSimulateStaleAttack({ approverId })}
-                disabled={isReviewing || !approverId.trim()}
-                title="Test CE-TC3: Demonstrates that altering content without re-hashing is trapped with HTTP 409"
-              >
-                <AlertTriangle size={15} /> Test Stale Approval (CE-TC3)
-              </button>
+          {/* Bottom Cryptographic Approval Gateway */}
+          <div
+            className="p-5 bg-surface-container-high rounded-xl shadow-2xl relative overflow-hidden flex flex-col gap-4 border border-outline-variant/40"
+            id="crypto-gateway-card"
+          >
+            <div className="absolute -top-12 -right-12 w-32 h-32 bg-secondary/10 rounded-full blur-2xl pointer-events-none"></div>
 
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-secondary-container/20 flex items-center justify-center text-secondary shrink-0">
+                  <span className="material-symbols-outlined text-xl">key</span>
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-on-surface">
+                    Cryptographic Approval Gateway
+                  </h2>
+                  <p className="text-xs text-on-surface-variant">
+                    Human sign-off on AI explanation &amp; audit digest
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`px-3 py-1 rounded font-mono text-xs font-bold shrink-0 uppercase ${
+                  isDelivered
+                    ? 'bg-secondary-container/20 text-secondary border border-secondary/40'
+                    : isRejected
+                    ? 'bg-error-container/20 text-error border border-error/40'
+                    : 'bg-tertiary-container/20 text-tertiary-fixed-dim border border-tertiary-fixed-dim/40'
+                }`}
+              >
+                {workflowState.replace('_', ' ')}
+              </span>
+            </div>
+
+            {/* Metadata Verification Matrix */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-mono">
+              <div className="p-2.5 rounded-lg bg-surface-container flex flex-col border border-outline-variant/20">
+                <span className="text-outline text-[11px] font-bold uppercase tracking-wider mb-0.5">
+                  AUTHORIZED SIGNER
+                </span>
+                <input
+                  type="text"
+                  value={approverId}
+                  onChange={(e) => setApproverId(e.target.value)}
+                  className="bg-transparent text-on-surface font-semibold text-sm outline-none border-b border-transparent focus:border-primary truncate"
+                />
+              </div>
+              <div className="p-2.5 rounded-lg bg-surface-container flex flex-col border border-outline-variant/20">
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-outline text-[11px] font-bold uppercase tracking-wider">
+                    OUTPUT HASH (CE-TC3)
+                  </span>
+                  {proposal?.output_hash && (
+                    <button
+                      onClick={copyMerkleHash}
+                      className="text-primary hover:text-on-surface text-xs flex items-center gap-1 cursor-pointer"
+                      title="Copy canonical output hash"
+                    >
+                      <span className="material-symbols-outlined text-xs">
+                        {copiedHash ? 'done' : 'content_copy'}
+                      </span>
+                    </button>
+                  )}
+                </div>
+                <span
+                  className="text-primary font-bold font-mono text-sm truncate cursor-pointer"
+                  title={proposal?.output_hash}
+                >
+                  {proposal?.output_hash
+                    ? `${proposal.output_hash.slice(0, 14)}...${proposal.output_hash.slice(-6)}`
+                    : 'Awaiting generation'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-surface-container flex flex-col border border-outline-variant/20">
+                <span className="text-outline text-[11px] font-bold uppercase tracking-wider mb-0.5">
+                  SESSION ID
+                </span>
+                <span className="text-secondary font-mono font-semibold text-xs truncate" title={requestId}>
+                  {requestId ? `${requestId.slice(0, 16)}...` : 'Pending'}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-lg bg-surface-container flex flex-col border border-outline-variant/20">
+                <span className="text-outline text-[11px] font-bold uppercase tracking-wider mb-0.5">
+                  EVIDENCE RECORDS
+                </span>
+                <span className="text-secondary font-semibold text-xs">
+                  {evidence.length} recorded ({untrustedItems.length} untrusted)
+                </span>
+              </div>
+            </div>
+
+            {/* Prominent Signing CTAs */}
+            <div className="flex flex-col gap-2.5 pt-1">
               <button
-                type="button"
-                className="btn btn-success"
+                className="w-full py-3.5 px-6 rounded-xl text-base font-bold text-on-primary bg-secondary-container hover:bg-secondary transition-all shadow-[0_0_24px_rgba(5,231,119,0.35)] hover:shadow-[0_0_32px_rgba(5,231,119,0.55)] active:scale-[0.99] flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50"
                 onClick={() => onReview({ decision: 'approve', approverId })}
-                disabled={isReviewing || !approverId.trim()}
+                disabled={isReviewing || isDelivered}
+                id="btn-cryptographic-sign"
+                type="button"
               >
-                <CheckCircle size={15} /> Approve & Deliver
+                {isReviewing ? (
+                  <>
+                    <span className="material-symbols-outlined text-xl animate-spin">
+                      progress_activity
+                    </span>
+                    <span>Submitting Decision to Enclave...</span>
+                  </>
+                ) : isDelivered ? (
+                  <>
+                    <span className="material-symbols-outlined text-xl">check_circle</span>
+                    <span>Cryptographically Signed &amp; Delivered</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-xl">verified</span>
+                    <span>Approve &amp; Cryptographically Sign</span>
+                  </>
+                )}
               </button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <button
+                  className="w-full py-2.5 px-3.5 rounded-lg text-xs font-mono font-bold text-error hover:bg-error-container/20 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-error/40 disabled:opacity-50"
+                  onClick={() => onReview({ decision: 'reject', approverId })}
+                  disabled={isReviewing || isRejected}
+                  id="btn-flag-snippet"
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-base">flag</span>
+                  <span>Reject Proposal</span>
+                </button>
+
+                <button
+                  className="w-full py-2.5 px-3.5 rounded-lg text-xs font-mono font-bold text-tertiary-fixed-dim hover:bg-tertiary-container/20 transition-colors flex items-center justify-center gap-2 cursor-pointer border border-tertiary-fixed-dim/40 disabled:opacity-50"
+                  onClick={() => onSimulateStaleAttack({ approverId })}
+                  disabled={isReviewing || isDelivered}
+                  title="Verify CE-TC3: Modifies content to prove that hash mismatch returns HTTP 409 Conflict."
+                  type="button"
+                >
+                  <span className="material-symbols-outlined text-base">shield_with_heart</span>
+                  <span>Simulate Stale Attack (CE-TC3)</span>
+                </button>
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* State messages for non-awaiting review */}
-        {isDelivered && (
-          <div style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#6ee7b7', fontSize: '0.85rem' }}>
-            <CheckCircle size={16} />
-            <span>Proposal approved and cryptographically delivered to Markdown.</span>
+            {/* Success Toast Notification */}
+            {isDelivered && (
+              <div
+                className="p-3.5 rounded-lg bg-secondary-container/20 text-secondary text-sm font-mono flex items-center justify-between border border-secondary/40"
+                id="sign-success-toast"
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="material-symbols-outlined text-lg">task_alt</span>
+                  <span className="font-semibold">Signed and delivered. Output hash verified.</span>
+                </div>
+                <span className="text-on-surface-variant font-bold">
+                  {requestId ? `ID: ${requestId.slice(0, 8)}` : ''}
+                </span>
+              </div>
+            )}
           </div>
-        )}
-
-        {isRejected && (
-          <div style={{ background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: '8px', padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fca5a5', fontSize: '0.85rem' }}>
-            <XCircle size={16} />
-            <span>Proposal was rejected by human reviewer. Workflow halted before delivery.</span>
-          </div>
-        )}
-      </div>
+        </>
+      )}
     </div>
   );
 }

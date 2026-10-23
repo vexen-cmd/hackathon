@@ -149,11 +149,7 @@ class Orchestrator:
         if self.sm.current != WorkflowState.FORMATTING:
             raise RuntimeError("Output can only be formatted after approval.")
         check_approval(approval, proposal)
-        formatted_markdown = (
-            f"# {proposal.language.name} Snippet\n\n"
-            f"## Explanation\n\n{proposal.explanation}\n\n"
-            f"## Documentation\n\n```\n{proposal.documentation}\n```\n"
-        )
+        formatted_markdown = proposal.documentation
         self.sm.transition(WorkflowState.DELIVERED)
         explanation_hash = sha256(proposal.explanation.encode("utf-8")).hexdigest()
         four_statuses = {

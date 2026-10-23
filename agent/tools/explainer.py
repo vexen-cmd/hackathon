@@ -10,7 +10,7 @@ class StubExplainer:
     def explain_and_document(self, code: str, language: str) -> tuple[str, str]:
         return (
             f"Stub explanation for {language} snippet.",
-            f"# {language} documentation stub",
+            f"# {language} Snippet\n\n## Overview\n\nDocumentation stub.\n\n## Code Structure\n\n```text\nproject/\n└── snippet\n```",
         )
 
 

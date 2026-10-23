@@ -21,6 +21,7 @@ build/
 .next/
 .vite/
 coverage/
+.run/
 
 # Python tooling and virtual environments
 .mypy_cache/

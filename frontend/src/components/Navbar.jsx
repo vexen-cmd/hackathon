@@ -1,117 +1,148 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Cpu, HelpCircle, Lock, X, CheckCircle2 } from 'lucide-react';
 
-export default function Navbar({ health, isHealthy }) {
-  const [showModal, setShowModal] = useState(false);
+export default function Navbar({ health, isHealthy, onToggleDrawer, onScrollToAudit }) {
+  const [showDocsModal, setShowDocsModal] = useState(false);
 
   return (
     <>
-      <header className="navbar">
-        <div className="nav-brand">
-          <div className="brand-icon-box">
-            <ShieldCheck size={20} color="#ffffff" />
-          </div>
-          <div>
-            <div className="brand-title">
-              Snippet<span>Studio</span>
-              <span className="brand-subtitle">HARNESS v2.0</span>
+      <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_2px_12px_rgba(0,0,0,0.5)] border-b border-outline-variant/30">
+        <div className="h-16 w-full px-4 lg:px-8 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              aria-label="Toggle History Drawer"
+              className="w-10 h-10 rounded-lg flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+              onClick={onToggleDrawer}
+              type="button"
+            >
+              <span className="material-symbols-outlined text-2xl">menu</span>
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-secondary-container to-primary-container flex items-center justify-center shadow-[0_0_16px_rgba(0,229,255,0.35)]">
+                <span className="material-symbols-outlined text-on-primary font-bold text-xl">shield</span>
+              </div>
+              <span className="text-xl font-bold text-on-surface tracking-tight hidden sm:inline-block">
+                Snippet Studio
+              </span>
+            </div>
+            <div className="flex items-center px-3 py-1 rounded-full bg-surface-container border border-primary/25 shadow-[0_0_12px_rgba(0,229,255,0.2)]">
+              <span className="text-xs font-mono font-bold text-primary tracking-widest">SAFETY-FIRST</span>
             </div>
           </div>
-        </div>
 
-        <div className="nav-meta">
-          <div className="engine-badge">
-            <span className={`status-dot ${isHealthy ? '' : 'warning'}`}></span>
-            <Cpu size={14} color="#94a3b8" />
-            <span style={{ fontWeight: 500 }}>
-              {isHealthy ? `Ollama (${health?.ollama_host || 'Local'})` : 'Connecting Engine...'}
-            </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-surface-container-low shadow-[inset_0_1px_2px_rgba(0,0,0,0.45)] border border-outline-variant/30">
+              <span className="relative flex h-2.5 w-2.5">
+                <span
+                  className={`animate-ping absolute inline-flex h-full w-full rounded-full ${
+                    isHealthy ? 'bg-secondary-container opacity-75' : 'bg-error-container opacity-75'
+                  }`}
+                ></span>
+                <span
+                  className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
+                    isHealthy ? 'bg-secondary' : 'bg-error'
+                  }`}
+                ></span>
+              </span>
+              <span className="text-sm font-mono text-on-surface font-medium hidden md:inline-block">
+                {isHealthy
+                  ? health?.ollama_host
+                    ? `Engine: ${health.ollama_host}`
+                    : 'Harness API Connected'
+                  : 'Engine Offline'}
+              </span>
+            </div>
+
+            <nav className="hidden sm:flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setShowDocsModal(true)}
+                className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded"
+              >
+                Docs
+              </button>
+              <button
+                type="button"
+                onClick={onScrollToAudit}
+                className="text-sm font-medium text-on-surface-variant hover:text-primary transition-colors cursor-pointer px-2 py-1 rounded"
+              >
+                Audit Log
+              </button>
+            </nav>
+
+            <div className="relative flex items-center pl-1">
+              <div className="w-9 h-9 rounded-full bg-surface-container-high ring-2 ring-primary/40 flex items-center justify-center font-mono text-sm text-primary font-bold overflow-hidden shadow-md">
+                <span className="material-symbols-outlined text-lg">person</span>
+              </div>
+              <span
+                className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-surface-container-lowest ${
+                  isHealthy ? 'bg-secondary-container' : 'bg-outline'
+                }`}
+                title={isHealthy ? 'Cryptographic Key Active' : 'Offline'}
+              ></span>
+            </div>
           </div>
-
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn btn-secondary"
-            style={{ padding: '0.35rem 0.75rem', fontSize: '0.78rem' }}
-            title="Architecture & Safety Model"
-          >
-            <HelpCircle size={14} />
-            Safety Architecture
-          </button>
         </div>
       </header>
 
-      {/* Architecture & Safety Modal */}
-      {showModal && (
+      {/* Architecture & Docs Modal */}
+      {showDocsModal && (
         <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0,0,0,0.7)',
-            backdropFilter: 'blur(8px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-            padding: '1rem',
-          }}
-          onClick={() => setShowModal(false)}
+          className="fixed inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDocsModal(false)}
         >
           <div
-            style={{
-              background: '#0f172a',
-              border: '1px solid #334155',
-              borderRadius: '12px',
-              maxWidth: '680px',
-              width: '100%',
-              padding: '1.75rem',
-              boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-            }}
+            className="w-full max-w-2xl bg-surface-container-low border border-outline-variant/40 rounded-2xl p-6 shadow-2xl relative"
             onClick={(e) => e.stopPropagation()}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <Lock size={20} color="#10b981" />
-                <h3 style={{ fontSize: '1.15rem', fontWeight: 600 }}>Deterministic Safety Harness</h3>
+            <div className="flex items-center justify-between pb-4 border-b border-surface-container-high mb-4">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-2xl">verified_user</span>
+                <h3 className="text-xl font-bold text-on-surface">Zero-Trust Enclave Safety Architecture</h3>
               </div>
               <button
-                onClick={() => setShowModal(false)}
-                style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
+                onClick={() => setShowDocsModal(false)}
+                className="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', fontSize: '0.875rem', color: '#cbd5e1', lineHeight: 1.6 }}>
-              <p>
-                <strong>Snippet Studio</strong> separates text generation from deterministic decision control.
-                The LLM (Qwen via Ollama) is an <em>untrusted generator</em>: it can propose explanations and documentation, but cannot bypass review.
-              </p>
-
-              <div style={{ background: '#1e293b', padding: '0.85rem', borderRadius: '8px', borderLeft: '4px solid #10b981' }}>
-                <strong style={{ color: '#34d399', display: 'block', marginBottom: '0.25rem' }}>
-                  Hash-Bound Approval Receipts (CE-TC3)
-                </strong>
-                Approval is bound to the canonical SHA-256 hash of the detected language, explanation, and documentation. Editing an explanation after approval changes the hash and invalidates the approval as stale (HTTP 409).
+            <div className="space-y-4 text-sm font-mono text-on-surface-variant leading-relaxed max-h-[70vh] overflow-y-auto pr-2">
+              <div className="p-4 rounded-xl bg-surface-container border border-primary/20">
+                <span className="text-primary font-bold text-base block mb-1">1. Zero-Trust Execution Boundary</span>
+                <p className="text-on-surface text-sm">
+                  Code inputs are treated strictly as untrusted data. AST tokenization isolates comment payloads, preventing any untrusted input from acting as executable instructions.
+                </p>
               </div>
 
-              <div style={{ background: '#1e293b', padding: '0.85rem', borderRadius: '8px', borderLeft: '4px solid #ef4444' }}>
-                <strong style={{ color: '#f87171', display: 'block', marginBottom: '0.25rem' }}>
-                  Prompt-Injection Protection (CE-TC4)
-                </strong>
-                Snippets containing phrases like <code># skip approval</code> are treated purely as data. They are recorded in the untrusted Evidence Ledger and cannot alter state machine transitions or auto-approve output.
+              <div className="p-4 rounded-xl bg-surface-container border border-secondary/20">
+                <span className="text-secondary font-bold text-base block mb-1">2. CE-TC3 Cryptographic Output Binding</span>
+                <p className="text-on-surface text-sm">
+                  Attestation binds mathematically to the canonical SHA-256 hash of the exact explanation and documentation. Modifying any character after attestation triggers HTTP 409 Conflict.
+                </p>
               </div>
 
-              <div style={{ background: '#1e293b', padding: '0.85rem', borderRadius: '8px', borderLeft: '4px solid #3b82f6' }}>
-                <strong style={{ color: '#60a5fa', display: 'block', marginBottom: '0.25rem' }}>
-                  Tamper-Evident Chained Event Log
-                </strong>
-                Every workflow state transition cryptographically chains to the previous state's SHA-256 hash. Delivered artifacts report whether the complete event chain verifies.
+              <div className="p-4 rounded-xl bg-surface-container border border-tertiary-fixed-dim/20">
+                <span className="text-tertiary-fixed-dim font-bold text-base block mb-1">3. CE-TC4 Adversarial Prompt Injection Isolation</span>
+                <p className="text-on-surface text-sm">
+                  Jailbreak patterns (e.g. system overrides, DAN commands) are quarantined into the untrusted evidence ledger. Proposals remain strictly quarantined until human attestation.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-surface-container border border-outline-variant/40">
+                <span className="text-on-surface font-bold text-base block mb-1">4. Tamper-Evident Event Chain</span>
+                <p className="text-on-surface text-sm">
+                  Every pipeline step (Tokenize, Infer, Propose, Attest, Deliver) produces a Merkle hash chain. Before final delivery, the full cryptographic chain is verified.
+                </p>
               </div>
             </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowModal(false)} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
-                <CheckCircle2 size={16} /> Got it
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => setShowDocsModal(false)}
+                className="px-5 py-2.5 rounded-lg bg-primary-container text-on-primary-container font-bold text-sm hover:shadow-[0_0_15px_rgba(0,229,255,0.4)] transition-all cursor-pointer"
+              >
+                Understood
               </button>
             </div>
           </div>
