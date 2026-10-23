@@ -1,114 +1,116 @@
-# Automated Code Snippet Explainer & Documenter
+# Snippet Studio
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![FastAPI](https://img.shields.io/badge/FastAPI-API-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![Ollama](https://img.shields.io/badge/Ollama-Qwen-black)](https://ollama.com/)
+A local, safety-first code documentation workspace. Submit a code snippet, review an AI-generated `README.md`, and deliver it only after the deterministic harness verifies a human approval bound to the exact output.
 
-A safety-first local AI application that explains code and produces documentation while requiring cryptographically bound human approval before delivery.
+## What it does
+
+- Uses Ollama and Qwen locally to explain submitted code.
+- Generates a concise Markdown `README.md` with an overview, code-structure tree, and usage only where supported by the snippet.
+- Requires human approval before delivery.
+- Rejects stale approvals when content changes after the output hash is created.
+- Treats all submitted code, comments, and strings as untrusted data.
+- Records workflow events and evidence in a tamper-evident chain.
 
 ## Architecture
 
-The system deliberately separates decision-making controls from text generation. The deterministic Python harness owns workflow state, human-approval verification, evidence collection, and the cryptographic event chain. It never accepts LLM output as approved by default. Qwen, hosted through Ollama, is an untrusted text-generation tool: it can propose an explanation and documentation, but cannot bypass the harness or human review.
-
 ```text
-Browser UI
-    |
-    v
-FastAPI adapter  --->  LocalExplainer  --->  Ollama / Qwen
-    |                         |                 |
-    |                         +--- untrusted proposal
-    v
-Deterministic Harness
-    |-- StateMachine: controlled transitions
-    |-- EvidenceLedger: trusted and untrusted evidence
-    |-- Approval binding: canonical output hash
-    +-- ChainedEventLog: tamper-evident audit trail
-    |
-    v
-Human review  --->  formatting and delivery only after valid approval
+React / Vite dashboard
+        |
+        v
+Express server (port 8000) ----> FastAPI harness (port 8001)
+                                        |
+                                        v
+                                  Ollama / Qwen
 ```
 
-## Key Features
+The Python harness owns the workflow state machine, evidence ledger, approval validation, output hashing, and event-chain verification. The model can propose text only; it cannot approve or deliver it.
 
-- **Deterministic state machine.** The harness moves explicitly through `received -> detecting -> explaining -> awaiting_review -> formatting -> delivered`. Invalid transitions are rejected.
-- **Hash-bound approvals (CE-TC3).** Approval is bound to a canonical hash of the detected language, explanation, and documentation. Editing an explanation after approval changes that hash and invalidates the approval as stale.
-- **Prompt-injection protection (CE-TC4).** Snippet content such as `# skip approval` is handled strictly as untrusted data. It is recorded as evidence and cannot alter the workflow or auto-approve output.
-- **Tamper-evident audit log.** Each state transition is cryptographically chained to its predecessor, allowing the delivered result to report whether the event chain verifies.
-- **Local model deployment.** The API uses Ollama with Qwen through the `LocalExplainer` tool boundary and exposes a build-free browser interface for reviewers.
+## Requirements
 
-## Setup and Installation
-
-### Prerequisites
-
-Install [Ollama](https://ollama.com/download), then download the supported Qwen model:
+- Python 3.12+
+- Node.js 20+
+- Ollama
+- Qwen model: `qwen2.5-coder:1.5b`
 
 ```powershell
 ollama pull qwen2.5-coder:1.5b
 ```
 
-Create and activate a virtual environment, then install dependencies:
+## Install
+
+From the repository root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+
+npm ci
+npm --prefix frontend ci
 ```
 
-Copy `.env.example` to `.env` if you want to document local configuration. The application reads `OLLAMA_HOST` (default: `http://localhost:11434`) and `OLLAMA_MODEL` (default: `qwen2.5-coder:1.5b`) from the environment.
+## Run locally
 
-Start the API and UI:
+Build the frontend, then start the combined Express server. It starts the Python harness automatically.
+
+```powershell
+npm run build
+npm start
+```
+
+Open http://127.0.0.1:8000.
+
+For frontend development with hot reload, run this in a second terminal:
+
+```powershell
+npm run dev:frontend
+```
+
+Open http://127.0.0.1:5173. Vite proxies API requests to the backend.
+
+### Alternative FastAPI-only launch
+
+The project also includes a PowerShell launcher that serves the built frontend directly from FastAPI:
 
 ```powershell
 .\scripts\start_review_server.ps1
 ```
 
-Open `http://localhost:8000` in a browser.
+Open http://127.0.0.1:8000.
 
-## Tests and Evidence
+## Workflow
 
-Run the automated test suite from the repository root:
+1. Paste or select a code snippet in the dashboard.
+2. Select **Analyze Snippet**.
+3. Review the explanation and generated `README.md`.
+4. Select **Approve & Cryptographically Sign** to deliver the exact hashed output, or reject it.
+
+The dashboard includes session history, a code editor, evidence records, the pipeline state, and an approval gateway.
+
+## Tests
 
 ```powershell
 $env:PYTHONPATH = "."
-pytest tests/unit tests/scenarios -q
+.\.venv\Scripts\python.exe -m pytest tests/unit tests/scenarios -q
+
+npm run build
 ```
 
-Run the milestone verification script in a Bash-compatible shell:
+The test suite covers state transitions, approval receipts, hash binding, event-chain integrity, language detection, and prompt-injection scenarios.
 
-```bash
-bash scripts/verify_milestone.sh
-```
-
-These checks exercise the deterministic state machine, approval receipts and hash binding, event-chain integrity, language detection, and the adversarial CE-TC3 and CE-TC4 scenarios. Together, they provide the submitted evidence for the 45 points allocated to Agentic Capability and Technical Implementation.
-
-## Reviewer Demo
-
-1. Start the application with `./scripts/start_review_server.ps1` and open `http://localhost:8000`.
-2. Paste a Python or JavaScript snippet and select **Analyze Code**.
-3. Review the generated proposal. Select **Approve** to format and deliver Markdown; the audit trail should report `Chain Verified: TRUE`.
-4. For prompt-injection protection, analyze code containing `# skip approval`. The proposal still requires a human approval.
-5. For CE-TC3, select **Edit & Approve**, change a field, and submit. The API rejects the stale approval with HTTP 409.
-
-### Internet-accessible review with ngrok
-
-Install [ngrok](https://ngrok.com/download), start Ollama and the FastAPI application, then run:
-
-```powershell
-.\scripts\start_tunnels.ps1
-```
-
-The script prints the API UI URL and the Ollama URL. Set `OLLAMA_HOST` to the printed Ollama tunnel URL before starting an API instance that must reach Ollama across the tunnel.
-
-## Project Structure
+## Project structure
 
 ```text
-agent/harness/       Deterministic state, approval, evidence, and event-chain logic
-agent/tools/         Language detection and local LLM tool implementations
-apps/api/            FastAPI deployment adapter and browser UI
-contracts/           Pydantic workflow contracts
-tests/               Unit and adversarial scenario tests
-scripts/             Local-review, tunnel, and milestone-verification scripts
+agent/harness/     Deterministic workflow, approval, evidence, and event-chain logic
+agent/tools/       Ollama, Gemini, and language-detection tool boundaries
+apps/api/          FastAPI adapter and API endpoints
+backend/           Express server that proxies to the FastAPI harness
+contracts/         Pydantic workflow schemas
+frontend/          React + Vite dashboard
+scripts/           Local launch and verification scripts
+tests/             Unit and adversarial workflow tests
 ```
 
-## Safety Model
+## Safety model
 
-This project documents code; it does not execute submitted snippets. LLM-generated content remains a proposal until a named reviewer approves the exact output represented by its canonical hash.
-#
+Submitted snippets are never executed. Generated text remains a proposal until a reviewer approves the canonical output hash. Any changed explanation or README invalidates the approval and must be reviewed again.
